@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, sans-serif;
+  --font-display: 'DM Sans', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-background: #F7F9FC;
+  --color-foreground: #0F172A;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0F172A;
+  --color-primary: #1E3A8A;
+  --color-primary-hover: #1e40af;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #F1F5F9;
+  --color-secondary-foreground: #334155;
+  --color-muted: #F1F5F9;
+  --color-muted-foreground: #64748B;
+  --color-accent: #6D28D9;
+  --color-accent-foreground: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-ring: #1E3A8A;
+
+  --color-risk-high: #DC2626;
+  --color-risk-high-bg: #FEF2F2;
+  --color-risk-high-border: #FECACA;
+  --color-risk-medium: #D97706;
+  --color-risk-medium-bg: #FFFBEB;
+  --color-risk-medium-border: #FDE68A;
+  --color-risk-low: #059669;
+  --color-risk-low-bg: #ECFDF5;
+  --color-risk-low-border: #A7F3D0;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  background-color: #F7F9FC;
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'DM Sans', ui-sans-serif, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Chat bubbles */
+.chat-user {
+  background: #1E3A8A;
+  color: #fff;
+  border-radius: 16px 16px 4px 16px;
+}
+.chat-ai {
+  background: #FFFFFF;
+  color: #0F172A;
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid #E2E8F0;
+}
