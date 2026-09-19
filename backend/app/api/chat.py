@@ -18,9 +18,6 @@ async def chat(
 
     try:
 
-        # ======================================
-        # Search ChromaDB
-        # ======================================
 
         results = search_contract(
             document_id=document_id,
@@ -38,11 +35,6 @@ async def chat(
                     "in this contract."
                 )
             )
-
-
-        # ======================================
-        # Build context
-        # ======================================
 
         context_parts = []
 
@@ -64,20 +56,31 @@ TEXT:
             context_parts
         )
 
-
-        # ======================================
-        # Ask Gemini
-        # ======================================
-
         llm_result = generate_answer(
             question=question,
             context=context
         )
 
+        if isinstance(llm_result, str):
+            answer_text = llm_result.strip()
+        elif isinstance(llm_result, dict):
+            if "answer" not in llm_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail="The model did not return a valid answer."
+                )
+            answer_text = llm_result.get("answer")
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="The model did not return a valid answer."
+            )
 
-        # ======================================
-        # Build citations
-        # ======================================
+        if not isinstance(answer_text, str) or not answer_text.strip():
+            raise HTTPException(
+                status_code=500,
+                detail="The model returned an empty answer."
+            )
 
         citations = []
 
@@ -103,11 +106,7 @@ TEXT:
 
         return {
             "question": question,
-
-            "answer": llm_result[
-                "answer"
-            ],
-
+            "answer": answer_text,
             "citations": citations
         }
 

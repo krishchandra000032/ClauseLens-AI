@@ -9,10 +9,6 @@ def extract_clauses(document_id: str):
     Extract structured legal clauses from a contract.
     """
 
-    # ============================================
-    # Get chunks for this document
-    # ============================================
-
     results = collection.get(
         where={
             "document_id": document_id
@@ -25,18 +21,11 @@ def extract_clauses(document_id: str):
     if not documents:
         return []
 
-
     clauses = []
 
+    MAX_CHUNKS = 8
 
-    # ============================================
-    # Analyze each chunk
-    # ============================================
-
-    for text, metadata in zip(
-        documents,
-        metadatas
-    ):
+    for text, metadata in list(zip(documents, metadatas))[:MAX_CHUNKS]:
 
         prompt = f"""
 You are ClauseLens AI, a legal contract
@@ -106,11 +95,6 @@ CONTRACT TEXT:
 {text}
 """
 
-
-        # ========================================
-        # Ask Groq
-        # ========================================
-
         response = client.chat.completions.create(
             model=MODEL_NAME,
 
@@ -128,11 +112,11 @@ CONTRACT TEXT:
                 }
             ],
 
-            reasoning_effort="medium",
 
             temperature=0.1,
 
             max_tokens=600
+            
         )
 
 
@@ -142,11 +126,6 @@ CONTRACT TEXT:
             .message
             .content
         )
-
-
-        # ========================================
-        # Parse JSON
-        # ========================================
 
         if not content:
             continue
@@ -158,11 +137,6 @@ CONTRACT TEXT:
         except json.JSONDecodeError:
 
             continue
-
-
-        # ========================================
-        # Keep actual clauses
-        # ========================================
 
         if result.get("is_clause"):
 

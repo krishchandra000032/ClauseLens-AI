@@ -95,9 +95,6 @@ async def upload_document(
                 file.file,
                 buffer
             )
-
-        # Persist the upload before processing so every later endpoint can
-        # resolve the document by the same id returned to the frontend.
         document = Document(
             id=document_id,
             filename=filename,

@@ -11,11 +11,6 @@ def analyze_contract_risks(
     Analyze all stored chunks of a contract
     and identify potentially risky clauses.
     """
-
-    # ============================================
-    # Get all chunks belonging to this document
-    # ============================================
-
     results = collection.get(
         where={
             "document_id": document_id
@@ -34,17 +29,13 @@ def analyze_contract_risks(
     if not documents:
         return []
 
-
-    # ============================================
-    # Analyze each chunk
-    # ============================================
-
     risks = []
 
-    for text, metadata in zip(
-        documents,
-        metadatas
-    ):
+    MAX_CHUNKS = 8
+
+    for text, metadata in list(
+        zip(documents, metadatas)
+    )[:MAX_CHUNKS]:
 
         prompt = f"""
 You are ClauseLens AI, a contract risk
@@ -131,11 +122,9 @@ CONTRACT CLAUSE:
                 }
             ],
 
-            reasoning_effort="medium",
-
             temperature=0.1,
 
-            max_tokens=500
+            max_tokens=600
         )
 
 
@@ -149,11 +138,6 @@ CONTRACT CLAUSE:
         if not isinstance(content, str):
             continue
 
-
-        # ========================================
-        # Parse JSON
-        # ========================================
-
         try:
 
             result = json.loads(
@@ -163,11 +147,6 @@ CONTRACT CLAUSE:
         except json.JSONDecodeError:
 
             continue
-
-
-        # ========================================
-        # Keep only risky clauses
-        # ========================================
 
         if result.get("is_risky"):
 

@@ -1,83 +1,45 @@
-import json
 import os
-
 from dotenv import load_dotenv
-from groq import Groq
-
-
-# ============================================
-# Environment
-# ============================================
+from openai import OpenAI
 
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if not GROQ_API_KEY:
-    raise ValueError(
-        "GROQ_API_KEY is missing from .env"
-    )
-
-
-# ============================================
-# Groq Client
-# ============================================
-
-client = Groq(
-    api_key=GROQ_API_KEY
+MODEL_NAME = os.getenv(
+    "GROQ_MODEL",
+    "llama-3.3-70b-versatile"
 )
 
-MODEL_NAME = "openai/gpt-oss-120b"
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY is missing from .env")
+
+client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1",
+    timeout=120.0,
+    max_retries=2
+)
 
 
-# ============================================
-# Generate RAG Answer
-# ============================================
-
-def generate_answer(
-    question: str,
-    context: str
-) -> dict:
-    """
-    Generate a grounded answer and identify
-    the chunk IDs used as evidence.
-    """
+def generate_answer(context: str, question: str):
 
     prompt = f"""
-You are ClauseLens AI, a legal contract
-analysis assistant.
+You are ClauseLens AI, an AI assistant specialized in contract analysis.
 
-Answer the user's question using ONLY
-the supplied contract context.
-
-IMPORTANT RULES:
-
-1. Do not use outside information.
-2. Do not invent facts.
-3. If the answer is not contained in the
-   supplied context, say that you could not
-   find the information.
-4. Only cite chunks that directly support
-   your answer.
-5. Return valid JSON only.
-
-Required JSON format:
-
-{{
-    "answer": "Your answer here",
-    "source_chunk_ids": [
-        "chunk_1",
-        "chunk_5"
-    ]
-}}
+Use ONLY the provided contract context to answer the user's question.
 
 CONTRACT CONTEXT:
-
 {context}
 
-USER QUESTION:
-
+QUESTION:
 {question}
+
+Instructions:
+- Give a clear and concise answer.
+- Do not invent information.
+- If the answer is not present in the context, say so.
+- Mention the relevant page/source when available.
 """
 
     response = client.chat.completions.create(
@@ -87,8 +49,7 @@ USER QUESTION:
             {
                 "role": "system",
                 "content": (
-                    "You are a careful legal "
-                    "document analysis assistant."
+                    "You are a precise contract analysis assistant."
                 )
             },
             {
@@ -97,35 +58,8 @@ USER QUESTION:
             }
         ],
 
-        reasoning_effort="medium",
-
-        temperature=0.1,
-
+        temperature=0.2,
         max_tokens=1000
     )
 
-    content = response.choices[0].message.content
-
-    if content is None:
-        content = ""
-
-    try:
-        result = json.loads(content)
-
-        return {
-            "answer": result.get(
-                "answer",
-                ""
-            ),
-            "source_chunk_ids": result.get(
-                "source_chunk_ids",
-                []
-            )
-        }
-
-    except json.JSONDecodeError:
-
-        return {
-            "answer": content,
-            "source_chunk_ids": []
-        }
+    return response.choices[0].message.content

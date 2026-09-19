@@ -154,27 +154,13 @@ def analyze_contract(
     document_id: str
 ):
 
-    # ==========================================
-    # 1. Extract clauses
-    # ==========================================
-
     clauses = extract_clauses(
         document_id
     )
 
-
-    # ==========================================
-    # 2. Analyze risks
-    # ==========================================
-
     risks = analyze_contract_risks(
         document_id
     )
-
-
-    # ==========================================
-    # 3. Calculate risk score
-    # ==========================================
 
     risk_score = calculate_overall_score(
         risks
@@ -183,12 +169,6 @@ def analyze_contract(
     overall_risk = get_overall_risk(
         risk_score
     )
-
-
-    # ==========================================
-    # 4. Save results to SQLite
-    # ==========================================
-
     db = SessionLocal()
 
     try:

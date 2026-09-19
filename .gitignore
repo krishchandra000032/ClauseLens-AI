@@ -1,10 +1,24 @@
+# Python
 venv/
-.env
 __pycache__/
 *.pyc
 
-uploads/*
-chroma_db/*
+# Environment
+.env
+.env.*
 
-.idea/
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Chroma
+chroma_db/
+chroma/
+
+# Node
+node_modules/
+dist/
+
+# IDE
 .vscode/

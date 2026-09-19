@@ -10,6 +10,7 @@ from app.api.risks import router as risks_router
 from app.api.clauses import router as clauses_router
 from app.api.analysis import router as analysis_router
 from app.api.documents import router as documents_router
+from app.api.reports import router as reports_router
 
 app = FastAPI(
     title="ClauseLens AI",
@@ -54,6 +55,9 @@ app.include_router(
 )
 app.include_router(
     documents_router
+)
+app.include_router(
+    reports_router
 )
 
 # The React development server runs on a different origin from FastAPI.

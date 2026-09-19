@@ -22,7 +22,16 @@ def get_analysis(document_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Document not found")
 
     risks = db.query(Risk).filter(Risk.document_id == document_id).all()
-    score = round(sum(risk.score or 0 for risk in risks) / len(risks)) if risks else 0
+    risk_scores = []
+    for risk in risks:
+        risk_score = getattr(risk, "score", None)
+        if risk_score is not None:
+            try:
+                risk_scores.append(float(risk_score))
+            except (TypeError, ValueError):
+                continue
+
+    score = round(sum(risk_scores) / len(risk_scores)) if risk_scores else 0
     overall_risk = "high" if score >= 70 else "medium" if score >= 40 else "low"
 
     return {

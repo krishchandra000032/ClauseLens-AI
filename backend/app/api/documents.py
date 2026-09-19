@@ -11,11 +11,6 @@ router = APIRouter(
     tags=["Documents"]
 )
 
-
-# ============================================
-# Get all documents
-# ============================================
-
 @router.get("/")
 def get_documents(
     db: Session = Depends(get_db)
@@ -38,11 +33,6 @@ def get_documents(
         }
         for document in documents
     ]
-
-
-# ============================================
-# Get one document
-# ============================================
 
 @router.get("/{document_id}")
 def get_document(
@@ -93,11 +83,6 @@ def get_document(
         "total_risks": risk_count
     }
 
-
-# ============================================
-# Delete document
-# ============================================
-
 @router.delete("/{document_id}")
 def delete_document(
     document_id: str,
@@ -119,11 +104,6 @@ def delete_document(
             detail="Document not found"
         )
 
-
-    # ----------------------------------------
-    # Delete vectors from ChromaDB
-    # ----------------------------------------
-
     try:
 
         collection.delete(
@@ -138,11 +118,6 @@ def delete_document(
             "ChromaDB delete warning:",
             repr(e)
         )
-
-
-    # ----------------------------------------
-    # Delete SQLite document
-    # ----------------------------------------
 
     db.delete(document)
 
