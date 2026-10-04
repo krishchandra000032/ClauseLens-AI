@@ -1,176 +1,327 @@
-from reportlab.lib.pagesizes import A4
+from io import BytesIO
+from xml.sax.saxutils import escape
+
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import (
+    getSampleStyleSheet,
+    ParagraphStyle
+)
+from reportlab.lib.units import mm
+
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer,
     Table,
     TableStyle,
-    PageBreak
+    PageBreak,
+    KeepTogether
 )
-from reportlab.lib.units import mm
-from io import BytesIO
+
+
+def safe_text(value):
+    if value is None:
+        return ""
+
+    return escape(str(value))
 
 
 def generate_summary_pdf(document_name, analysis):
-    """
-    Generate a PDF summary for a contract analysis.
-    """
-
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(
+
         buffer,
+
         pagesize=A4,
+
         rightMargin=18 * mm,
         leftMargin=18 * mm,
+
         topMargin=18 * mm,
         bottomMargin=18 * mm,
+
+        title="ClauseLens AI Contract Analysis",
+        author="ClauseLens AI"
     )
 
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
-        "TitleCustom",
+        "ClauseLensTitle",
+
         parent=styles["Title"],
-        fontSize=22,
-        leading=26,
+
+        fontSize=24,
+        leading=28,
+
         alignment=TA_CENTER,
-        spaceAfter=15,
+
+        spaceAfter=8
+    )
+
+    subtitle_style = ParagraphStyle(
+        "ClauseLensSubtitle",
+
+        parent=styles["Heading2"],
+
+        fontSize=15,
+        leading=19,
+
+        alignment=TA_CENTER,
+
+        spaceAfter=18
     )
 
     heading_style = ParagraphStyle(
-        "HeadingCustom",
+        "SectionHeading",
+
         parent=styles["Heading2"],
+
         fontSize=15,
-        leading=18,
-        spaceBefore=12,
-        spaceAfter=8,
+        leading=19,
+
+        spaceBefore=14,
+        spaceAfter=9
+    )
+
+    subheading_style = ParagraphStyle(
+        "SubHeading",
+
+        parent=styles["Heading3"],
+
+        fontSize=11,
+        leading=14,
+
+        spaceBefore=8,
+        spaceAfter=5
     )
 
     normal_style = ParagraphStyle(
         "NormalCustom",
+
         parent=styles["BodyText"],
-        fontSize=10,
-        leading=15,
+
+        fontSize=9.5,
+        leading=14,
+
+        spaceAfter=5
+    )
+
+    small_style = ParagraphStyle(
+        "Small",
+
+        parent=styles["BodyText"],
+
+        fontSize=8,
+        leading=11
+    )
+
+    risk_style = ParagraphStyle(
+        "RiskText",
+
+        parent=normal_style,
+
+        leftIndent=5,
+        spaceAfter=5
+    )
+
+    overall_risk = analysis.get(
+        "overall_risk",
+        "N/A"
+    )
+
+    risk_score = analysis.get(
+        "risk_score",
+        0
+    )
+
+    total_clauses = analysis.get(
+        "total_clauses",
+        0
+    )
+
+    total_risks = analysis.get(
+        "total_risks",
+        0
+    )
+
+    summary = analysis.get(
+        "summary",
+        "No AI summary available."
+    )
+
+    risks = analysis.get(
+        "risks",
+        []
+    )
+
+    clauses = analysis.get(
+        "clauses",
+        []
     )
 
     story = []
 
     story.append(
-        Paragraph("ClauseLens AI", title_style)
+        Spacer(1, 10 * mm)
     )
 
     story.append(
         Paragraph(
-            "Contract Analysis Summary",
-            styles["Heading1"]
+            "ClauseLens AI",
+            title_style
         )
     )
 
     story.append(
         Paragraph(
-            f"<b>Document:</b> {document_name}",
+            "Contract Analysis & Risk Summary",
+            subtitle_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Document:</b> "
+            f"{safe_text(document_name)}",
             normal_style
         )
     )
 
-    story.append(Spacer(1, 12))
+    story.append(
+        Spacer(1, 10)
+    )
 
     story.append(
-        Paragraph("Contract Overview", heading_style)
+        Paragraph(
+            "1. Contract Overview",
+            heading_style
+        )
     )
 
     overview_data = [
-        ["Overall Risk", analysis.get("overall_risk", "N/A")],
-        ["Risk Score", f'{analysis.get("risk_score", 0)} / 100'],
-        ["Clauses Found", str(analysis.get("total_clauses", 0))],
-        ["Risks Detected", str(analysis.get("total_risks", 0))],
+
+        [
+            Paragraph(
+                "<b>Overall Risk</b>",
+                normal_style
+            ),
+
+            Paragraph(
+                f"<b>{safe_text(overall_risk)}</b>",
+                normal_style
+            )
+        ],
+
+        [
+            Paragraph(
+                "<b>Risk Score</b>",
+                normal_style
+            ),
+
+            Paragraph(
+                f"{risk_score} / 100",
+                normal_style
+            )
+        ],
+
+        [
+            Paragraph(
+                "<b>Clauses Identified</b>",
+                normal_style
+            ),
+
+            Paragraph(
+                str(total_clauses),
+                normal_style
+            )
+        ],
+
+        [
+            Paragraph(
+                "<b>Potential Risks</b>",
+                normal_style
+            ),
+
+            Paragraph(
+                str(total_risks),
+                normal_style
+            )
+        ]
     ]
 
     overview_table = Table(
         overview_data,
-        colWidths=[70 * mm, 80 * mm]
+
+        colWidths=[
+            70 * mm,
+            80 * mm
+        ]
     )
 
     overview_table.setStyle(
         TableStyle([
-            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F5F9")),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
-            ("PADDING", (0, 0), (-1, -1), 8),
+
+            (
+                "BACKGROUND",
+                (0, 0),
+                (0, -1),
+                colors.HexColor("#E2E8F0")
+            ),
+
+            (
+                "GRID",
+                (0, 0),
+                (-1, -1),
+                0.5,
+                colors.HexColor("#94A3B8")
+            ),
+
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+
+            (
+                "PADDING",
+                (0, 0),
+                (-1, -1),
+                8
+            )
         ])
     )
 
-    story.append(overview_table)
-
-    story.append(Spacer(1, 15))
-
     story.append(
-        Paragraph("AI Summary", heading_style)
+        overview_table
     )
 
-    summary = analysis.get(
-        "summary",
-        analysis.get(
-            "ai_summary",
-            "No AI summary available."
+    story.append(
+        Paragraph(
+            "2. AI Contract Summary",
+            heading_style
         )
     )
 
     story.append(
         Paragraph(
-            str(summary),
+            safe_text(summary),
             normal_style
         )
     )
 
     story.append(
-        Paragraph("Identified Risks", heading_style)
+        Paragraph(
+            "3. Identified Contract Risks",
+            heading_style
+        )
     )
 
-    risks = analysis.get("risks", [])
-
-    if risks:
-
-        for index, risk in enumerate(risks, 1):
-
-            if isinstance(risk, dict):
-
-                risk_title = risk.get(
-                    "title",
-                    risk.get("name", f"Risk {index}")
-                )
-
-                description = risk.get(
-                    "description",
-                    risk.get("details", "")
-                )
-
-                severity = risk.get(
-                    "severity",
-                    risk.get("risk_level", "")
-                )
-
-                text = (
-                    f"<b>{index}. {risk_title}</b><br/>"
-                    f"<b>Severity:</b> {severity}<br/>"
-                    f"{description}"
-                )
-
-            else:
-                text = f"<b>{index}.</b> {str(risk)}"
-
-            story.append(
-                Paragraph(text, normal_style)
-            )
-
-            story.append(Spacer(1, 8))
-
-    else:
+    if not risks:
 
         story.append(
             Paragraph(
@@ -179,57 +330,148 @@ def generate_summary_pdf(document_name, analysis):
             )
         )
 
-    story.append(
-        Paragraph("Extracted Clauses", heading_style)
-    )
+    else:
 
-    clauses = analysis.get("clauses", [])
+        for index, risk in enumerate(
+            risks,
+            1
+        ):
 
-    if clauses:
+            if not isinstance(
+                risk,
+                dict
+            ):
 
-        for index, clause in enumerate(clauses, 1):
+                risk = {
+                    "title": f"Risk {index}",
+                    "description": str(risk)
+                }
 
-            if isinstance(clause, dict):
+            title = risk.get(
+                "title",
+                f"Risk {index}"
+            )
 
-                clause_name = clause.get(
-                    "title",
-                    clause.get(
-                        "name",
-                        f"Clause {index}"
+            category = risk.get(
+                "category",
+                "Other"
+            )
+
+            severity = risk.get(
+                "risk_level",
+                risk.get(
+                    "severity",
+                    "N/A"
+                )
+            )
+
+            score = risk.get(
+                "score",
+                0
+            )
+
+            explanation = risk.get(
+                "explanation",
+                risk.get(
+                    "description",
+                    ""
+                )
+            )
+
+            reason = risk.get(
+                "reason",
+                ""
+            )
+
+            page = risk.get(
+                "page",
+                None
+            )
+
+            elements = []
+
+            elements.append(
+                Paragraph(
+                    f"<b>{index}. "
+                    f"{safe_text(title)}</b>",
+                    subheading_style
+                )
+            )
+
+            elements.append(
+                Paragraph(
+                    f"<b>Category:</b> "
+                    f"{safe_text(category)}",
+                    risk_style
+                )
+            )
+
+            elements.append(
+                Paragraph(
+                    f"<b>Severity:</b> "
+                    f"{safe_text(severity)}",
+                    risk_style
+                )
+            )
+
+            elements.append(
+                Paragraph(
+                    f"<b>Risk Score:</b> "
+                    f"{score}/100",
+                    risk_style
+                )
+            )
+
+            if explanation:
+
+                elements.append(
+                    Paragraph(
+                        f"<b>Explanation:</b> "
+                        f"{safe_text(explanation)}",
+                        risk_style
                     )
                 )
 
-                description = clause.get(
-                    "description",
-                    clause.get("text", "")
+            if reason:
+
+                elements.append(
+                    Paragraph(
+                        f"<b>Reason:</b> "
+                        f"{safe_text(reason)}",
+                        risk_style
+                    )
                 )
 
-                page = clause.get(
-                    "page",
-                    ""
-                )
+            if page:
 
-                text = (
-                    f"<b>{index}. {clause_name}</b><br/>"
-                    f"{description}"
-                )
-
-                if page:
-                    text += f"<br/><b>Page:</b> {page}"
-
-            else:
-
-                text = (
-                    f"<b>{index}.</b> {str(clause)}"
+                elements.append(
+                    Paragraph(
+                        f"<b>Source Page:</b> "
+                        f"{safe_text(page)}",
+                        risk_style
+                    )
                 )
 
             story.append(
-                Paragraph(text, normal_style)
+                KeepTogether(elements)
             )
 
-            story.append(Spacer(1, 8))
+            story.append(
+                Spacer(1, 5)
+            )
 
-    else:
+    story.append(
+        PageBreak()
+    )
+
+    story.append(
+        Paragraph(
+            "4. Extracted Contract Clauses",
+            heading_style
+        )
+    )
+
+    if not clauses:
 
         story.append(
             Paragraph(
@@ -237,25 +479,159 @@ def generate_summary_pdf(document_name, analysis):
                 normal_style
             )
         )
-    story.append(Spacer(1, 20))
+
+    else:
+
+        for index, clause in enumerate(
+            clauses,
+            1
+        ):
+
+            if not isinstance(
+                clause,
+                dict
+            ):
+
+                clause = {
+                    "title": f"Clause {index}",
+                    "text": str(clause)
+                }
+
+            clause_type = clause.get(
+                "clause_type",
+                "Other"
+            )
+
+            title = clause.get(
+                "title",
+                f"Clause {index}"
+            )
+
+            summary_text = clause.get(
+                "summary",
+                clause.get(
+                    "description",
+                    ""
+                )
+            )
+
+            page = clause.get(
+                "page",
+                None
+            )
+
+            chunk_id = clause.get(
+                "chunk_id",
+                None
+            )
+
+            elements = []
+
+            elements.append(
+                Paragraph(
+                    f"<b>{index}. "
+                    f"{safe_text(title)}</b>",
+                    subheading_style
+                )
+            )
+
+            elements.append(
+                Paragraph(
+                    f"<b>Type:</b> "
+                    f"{safe_text(clause_type)}",
+                    normal_style
+                )
+            )
+
+            if summary_text:
+
+                elements.append(
+                    Paragraph(
+                        f"<b>Summary:</b> "
+                        f"{safe_text(summary_text)}",
+                        normal_style
+                    )
+                )
+
+            if page:
+
+                elements.append(
+                    Paragraph(
+                        f"<b>Page:</b> "
+                        f"{safe_text(page)}",
+                        small_style
+                    )
+                )
+
+            if chunk_id:
+
+                elements.append(
+                    Paragraph(
+                        f"<b>Chunk:</b> "
+                        f"{safe_text(chunk_id)}",
+                        small_style
+                    )
+                )
+
+            story.append(
+                KeepTogether(elements)
+            )
+
+            story.append(
+                Spacer(1, 8)
+            )
+
+    story.append(
+        PageBreak()
+    )
 
     story.append(
         Paragraph(
-            "<b>Disclaimer</b>",
+            "5. Disclaimer",
             heading_style
         )
     )
 
     story.append(
         Paragraph(
-            "ClauseLens AI provides automated informational "
-            "contract analysis and does not constitute legal advice. "
-            "Important contractual decisions should be reviewed "
-            "with a qualified legal professional.",
+            "ClauseLens AI provides automated "
+            "informational contract analysis and "
+            "does not constitute legal advice. "
+            "The analysis is generated using automated "
+            "document processing and artificial intelligence "
+            "and may contain errors or omissions. "
+            "Important contractual decisions should be "
+            "reviewed by a qualified legal professional.",
             normal_style
         )
     )
-    doc.build(story)
+
+    def add_page_number(canvas, doc):
+
+        canvas.saveState()
+
+        canvas.setFont(
+            "Helvetica",
+            8
+        )
+
+        canvas.setFillColor(
+            colors.grey
+        )
+
+        canvas.drawCentredString(
+            A4[0] / 2,
+            10 * mm,
+            f"ClauseLens AI • Page {doc.page}"
+        )
+
+        canvas.restoreState()
+
+        doc.build(
+        story,
+        onFirstPage=add_page_number,
+        onLaterPages=add_page_number
+    )
 
     buffer.seek(0)
 

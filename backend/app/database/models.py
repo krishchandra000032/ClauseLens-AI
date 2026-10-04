@@ -3,28 +3,75 @@ from datetime import datetime
 from sqlalchemy import (
     Column,
     DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
-    ForeignKey
 )
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 from app.database.database import Base
 
 
-# ============================================
-# Documents
-# ============================================
+# ============================================================
+# USER
+# ============================================================
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    name: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    email: Mapped[str] = mapped_column(
+        String,
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    documents = relationship(
+        "Document",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+
+# ============================================================
+# DOCUMENT
+# ============================================================
 
 class Document(Base):
-
     __tablename__ = "documents"
 
     id = Column(
         String,
         primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
         index=True
     )
 
@@ -43,8 +90,6 @@ class Document(Base):
         default=datetime.utcnow
     )
 
-    # Relationships
-
     clauses = relationship(
         "Clause",
         back_populates="document",
@@ -57,13 +102,17 @@ class Document(Base):
         cascade="all, delete-orphan"
     )
 
+    user = relationship(
+        "User",
+        back_populates="documents"
+    )
 
-# ============================================
-# Clauses
-# ============================================
+
+# ============================================================
+# CLAUSE
+# ============================================================
 
 class Clause(Base):
-
     __tablename__ = "clauses"
 
     id = Column(
@@ -108,12 +157,11 @@ class Clause(Base):
     )
 
 
-# ============================================
-# Risks
-# ============================================
+# ============================================================
+# RISK
+# ============================================================
 
 class Risk(Base):
-
     __tablename__ = "risks"
 
     id = Column(

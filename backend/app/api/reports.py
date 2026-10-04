@@ -3,21 +3,38 @@ from fastapi.responses import StreamingResponse
 
 from app.services.pdf_service import generate_summary_pdf
 
+from app.database.database import SessionLocal
+from app.database.models import Document
+
+
 router = APIRouter(
     prefix="/reports",
     tags=["Reports"]
 )
 
 
-@router.get("/{document_id}/summary")
+@router.get(
+    "/{document_id}/summary",
+    summary="Download Contract Analysis Summary",
+    description="Generates and downloads a PDF containing the contract analysis summary.",
+    responses={
+        200: {
+            "description": "Contract analysis PDF",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Document not found"
+        }
+    }
+)
 def download_summary(document_id: str):
-
-    # TODO:
-    # Replace this section with your existing
-    # database query for the document.
-
-    from app.database.database import SessionLocal
-    from app.database.models import Document
 
     db = SessionLocal()
 
@@ -35,6 +52,7 @@ def download_summary(document_id: str):
                 detail="Document not found"
             )
 
+        # Build analysis data
         analysis = {
             "overall_risk": getattr(
                 document,
@@ -71,6 +89,7 @@ def download_summary(document_id: str):
             "clauses": []
         }
 
+        # Generate PDF
         pdf = generate_summary_pdf(
             getattr(
                 document,
@@ -80,17 +99,18 @@ def download_summary(document_id: str):
             analysis
         )
 
-        filename = "ClauseLens_Contract_Summary.pdf"
+        filename = "ClauseLens_Contract_Analysis_Summary.pdf"
 
+        # Return PDF as downloadable file
         return StreamingResponse(
             pdf,
             media_type="application/pdf",
             headers={
-                "Content-Disposition":
+                "Content-Disposition": (
                     f'attachment; filename="{filename}"'
+                )
             }
         )
 
     finally:
-
         db.close()

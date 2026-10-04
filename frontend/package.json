@@ -11,9 +11,11 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "latest",
+    "lucide-react": "^1.47.0",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
+    "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3",
     "vite": "latest"
   },

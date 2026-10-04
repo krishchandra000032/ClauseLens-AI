@@ -221,21 +221,11 @@ def analyze_contract(
     # ==========================================
 
     return {
-        "document_id": document_id,
-
-        "overall_risk": overall_risk,
-
-        "risk_score": risk_score,
-
-        "total_clauses": len(
-            clauses
-        ),
-
-        "total_risks": len(
-            risks
-        ),
-
-        "clauses": clauses,
-
-        "risks": risks
-    }
+    "document_id": document_id,
+    "overall_risk": overall_risk,
+    "risk_score": risk_score,
+    "total_clauses": len(clauses),
+    "total_risks": len(risks),
+    "clauses": clauses,
+    "risks": risks
+}
