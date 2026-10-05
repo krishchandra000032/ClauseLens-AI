@@ -689,7 +689,7 @@ npm install
 
 # 9️⃣ Configure Frontend API URL
 
-If your frontend uses an environment variable, create:
+Copy `frontend/.env.example` to `frontend/.env` and use this backend URL for local development:
 
 ```text
 frontend/.env
@@ -698,18 +698,10 @@ frontend/.env
 Add:
 
 ```env
-VITE_API_URL=http://localhost:8000
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Your frontend API service should use the variable:
-
-```typescript
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
-```
-
-Do not commit:
+The sign-in forms and workspace API client both use `VITE_API_BASE_URL`. Do not commit:
 
 ```text
 frontend/.env
@@ -767,6 +759,7 @@ http://127.0.0.1:8000
 
 ```powershell
 cd ClauseLens-AI\frontend
+Copy-Item .env.example .env
 npm run dev
 ```
 
@@ -785,6 +778,8 @@ http://localhost:5173
 | Frontend | http://localhost:5173 |
 | Backend | http://127.0.0.1:8000 |
 | API Documentation | http://127.0.0.1:8000/docs |
+
+For a deployed frontend and backend on different origins, set `VITE_API_BASE_URL` to the backend URL in the frontend environment and `FRONTEND_ORIGINS` to the frontend origin in the backend environment.
 
 ---
 
@@ -1017,7 +1012,7 @@ frontend/.env
 Example:
 
 ```env
-VITE_API_URL=http://localhost:8000
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 ### Never expose your Groq API key in frontend code.
@@ -1127,7 +1122,7 @@ http://127.0.0.1:8000/docs
 Then check the frontend environment variable:
 
 ```env
-VITE_API_URL=http://localhost:8000
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 Restart Vite after changing `.env`.

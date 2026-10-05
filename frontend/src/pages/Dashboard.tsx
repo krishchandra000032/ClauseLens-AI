@@ -12,18 +12,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const [documentsError, setDocumentsError] = useState("");
 
   useEffect(() => {
-    listDocuments().then(setDocuments).finally(() => setLoading(false));
+    let active = true;
+    listDocuments()
+      .then((result) => { if (active) setDocuments(result); })
+      .catch((failure: unknown) => {
+        if (active) setDocumentsError(failure instanceof Error ? failure.message : "Unable to load your documents.");
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   async function handleUpload() {
     if (!selectedFile) return;
+    setUploadError("");
     setUploading(true);
     try {
       const doc = await uploadDocument(selectedFile);
       navigate(`/processing/${doc.id}`);
-    } catch {
+    } catch (failure) {
+      setUploadError(failure instanceof Error ? failure.message : "Unable to upload this contract.");
       setUploading(false);
     }
   }
@@ -92,9 +103,14 @@ export default function Dashboard() {
       {/* Upload area */}
       <div style={{ marginBottom: 16 }}>
         <UploadDropzone
-          onFileSelect={(f) => setSelectedFile(f)}
+          onFileSelect={(f) => { setSelectedFile(f); setUploadError(""); }}
           loading={uploading}
         />
+        {uploadError && (
+          <p role="alert" style={{ marginTop: 12, color: "#B91C1C", fontSize: 13 }}>
+            {uploadError}
+          </p>
+        )}
         {selectedFile && (
           <div
             style={{
@@ -254,6 +270,10 @@ export default function Dashboard() {
                 }}
               />
             ))}
+          </div>
+        ) : documentsError ? (
+          <div role="alert" style={{ padding: 20, border: "1px solid #FECACA", background: "#FEF2F2", color: "#991B1B", borderRadius: 10, fontSize: 14 }}>
+            {documentsError}
           </div>
         ) : documents.length === 0 ? (
           <EmptyState

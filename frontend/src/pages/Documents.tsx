@@ -91,7 +91,7 @@ export default function Documents() {
           </p>
         </div>
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/app")}
           style={{
             padding: "10px 20px",
             borderRadius: 9,
@@ -217,7 +217,7 @@ export default function Documents() {
           action={
             !search ? (
               <button
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/app")}
                 style={{
                   padding: "9px 20px",
                   background: "#1E3A8A",

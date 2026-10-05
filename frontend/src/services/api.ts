@@ -1,501 +1,680 @@
+import { getAccessToken } from "./auth";
 import type {
-  Document,
-  Risk,
+  AnalysisResult as AppAnalysisResult,
+  AskResponse as AppAskResponse,
+  ChatMessage as AppChatMessage,
+  Clause as AppClause,
+  Document as AppDocument,
+  Risk as AppRisk,
   RiskLevel,
-  Clause,
-  AnalysisResult,
-  ChatMessage,
-  AskResponse,
 } from "../types";
 
-import {
-  mockDocuments,
-  mockRisks,
-  mockClauses,
-  mockAnalysis,
-  mockChatHistory,
-} from "../data/mockData";
-
-const USE_MOCK = false;
-
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-async function request<T>(
-  path: string,
-  options?: RequestInit
-): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+function getApiHeaders(
+  headers?: HeadersInit,
+  accept = "application/json"
+): Headers {
+  const result = new Headers(headers);
+  result.set("Accept", accept);
 
-  if (!res.ok) {
-    const text = await res.text();
+  const token = getAccessToken();
 
-    throw new Error(
-      `API error ${res.status}: ${text}`
-    );
+  if (token) {
+    result.set("Authorization", `Bearer ${token}`);
   }
 
-  return res.json() as Promise<T>;
+  return result;
 }
 
-function delay(ms = 600) {
-  return new Promise((r) => setTimeout(r, ms));
+/* =========================================================
+   TYPES
+========================================================= */
+
+export interface UploadResponse {
+  message: string;
+  document: {
+    id: string;
+    filename: string;
+    user_id: number;
+    file_path: string;
+    created_at?: string;
+  };
 }
 
-type BackendDocument = {
-  id: string;
-  filename: string;
-  file_path?: string;
-  created_at: string;
+export interface ProcessResponse {
+  document_id: string;
+  status?: string;
+  message?: string;
+  text?: string;
+}
 
+export interface Clause {
+  id?: string;
+  document_id?: string;
+  clause_type?: string;
+  title?: string;
+  summary?: string;
+  text?: string;
+  page?: number;
+  chunk_id?: string;
+  key_points?: string[];
+}
+
+export interface Risk {
+  id?: string;
+  document_id?: string;
+  risk_level?: string;
+  score?: number;
+  category?: string;
+  title?: string;
+  explanation?: string;
+  reason?: string;
+  text?: string;
+  page?: number;
+  chunk_id?: string;
+}
+
+export interface AnalysisResponse {
+  document_id: string;
+  overall_risk: string;
+  risk_score: number;
+  total_clauses: number;
+  total_risks: number;
+  high_risks?: number;
+  medium_risks?: number;
+  low_risks?: number;
+  summary?: string;
+  ai_summary?: string;
+  clauses?: Clause[];
+  risks?: Risk[];
+}
+
+export interface DocumentResponse {
+  id?: string;
+  document_id?: string;
+  filename?: string;
+  file_name?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  overall_risk?: string;
+  risk_score?: number;
   total_clauses?: number;
   total_risks?: number;
-};
-
-function fileType(
-  filename: string
-): Document["fileType"] {
-  const extension = filename
-    .split(".")
-    .pop()
-    ?.toUpperCase();
-
-  return extension === "DOCX" || extension === "DOC"
-    ? extension
-    : "PDF";
+  summary?: string;
 }
 
-function riskLevel(
+export interface ChatRequest {
+  question: string;
+}
+
+export interface ChatResponse {
+  answer?: string;
+  response?: string;
+  message?: string;
+
+  sources?: Array<{
+    page?: number;
+    text?: string;
+    chunk_id?: string;
+  }>;
+}
+
+interface BackendAnalysisSummary {
+  document_id: string;
+  overall_risk: string;
+  risk_score: number;
+  total_clauses: number;
+  total_risks: number;
+  high_risks?: number;
+  medium_risks?: number;
+  low_risks?: number;
+  summary?: string;
+}
+
+function getRiskLevel(
+  value?: string,
   score?: number
-): RiskLevel | undefined {
-  if (score === undefined) {
-    return undefined;
+): RiskLevel {
+  const normalized = value?.toLowerCase();
+
+  if (
+    normalized === "high" ||
+    normalized === "medium" ||
+    normalized === "low"
+  ) {
+    return normalized;
   }
 
-  return score >= 70
+  return (score ?? 0) >= 70
     ? "high"
-    : score >= 40
+    : (score ?? 0) >= 40
       ? "medium"
       : "low";
 }
 
 function toDocument(
-  document: BackendDocument
-): Document {
+  document: DocumentResponse,
+  fileSize = 0,
+  status?: AppDocument["status"]
+): AppDocument {
+  const filename =
+    document.filename ||
+    document.file_name ||
+    "Untitled contract";
+
+  const extension =
+    filename.split(".").pop()?.toUpperCase();
+
+  const resolvedStatus =
+    status ||
+    (
+      document.status === "failed"
+        ? "failed"
+        : document.status === "pending"
+          ? "pending"
+          : document.status === "processing"
+            ? "processing"
+            : "completed"
+    );
+
   return {
-    id: document.id,
-    filename: document.filename,
-
-    fileType: fileType(document.filename),
-
-    fileSize: 0,
-
-    uploadDate: document.created_at,
-
-    status:
-      document.total_risks === undefined
-        ? "processing"
-        : "completed",
-
+    id: document.id || document.document_id || "",
+    filename,
+    fileType:
+      extension === "DOCX" || extension === "DOC"
+        ? extension
+        : "PDF",
+    fileSize,
+    uploadDate:
+      document.created_at ||
+      document.updated_at ||
+      new Date().toISOString(),
+    status: resolvedStatus,
+    riskScore: document.risk_score,
+    riskLevel: document.overall_risk
+      ? getRiskLevel(
+          document.overall_risk,
+          document.risk_score
+        )
+      : undefined,
     clausesCount: document.total_clauses,
     risksCount: document.total_risks,
   };
 }
 
-
-export async function listDocuments(): Promise<Document[]> {
-  if (USE_MOCK) {
-    await delay();
-
-    return [...mockDocuments];
-  }
-
-  const documents = await request<BackendDocument[]>("/documents/");
-
-  const detailedDocuments = await Promise.all(
-    documents.map((document) => request<BackendDocument>(`/documents/${document.id}`))
-  );
-
-  return detailedDocuments.map(toDocument);
+function toRisk(
+  documentId: string,
+  risk: Risk
+): AppRisk {
+  return {
+    id:
+      risk.id ||
+      `${documentId}-${risk.title || "risk"}`,
+    documentId,
+    title:
+      risk.title ||
+      risk.category ||
+      "Potential risk",
+    category: risk.category || "Other",
+    severity: getRiskLevel(
+      risk.risk_level,
+      risk.score
+    ),
+    explanation:
+      risk.explanation ||
+      risk.reason ||
+      "",
+    pageNumber: risk.page || 0,
+    whyRisky:
+      risk.reason ||
+      risk.explanation ||
+      "",
+    clauseText: risk.text,
+  };
 }
 
-export async function getDocument(
-  id: string
-): Promise<Document> {
-  if (USE_MOCK) {
-    await delay(300);
+function toClause(
+  documentId: string,
+  clause: Clause
+): AppClause {
+  const validCategories = [
+    "Termination",
+    "Compensation",
+    "Confidentiality",
+    "Intellectual Property",
+    "Non-Compete",
+    "Leave",
+    "Dispute Resolution",
+    "Other",
+  ];
 
-    const doc = mockDocuments.find((d) => d.id === id) ?? mockDocuments[0];
+  const category = validCategories.includes(
+    clause.clause_type || ""
+  )
+    ? clause.clause_type as AppClause["category"]
+    : "Other";
 
-    if (!doc) {
-      throw new Error("Document not found");
+  return {
+    id:
+      clause.id ||
+      `${documentId}-${clause.title || "clause"}`,
+    documentId,
+    title: clause.title || category,
+    category,
+    summary: clause.summary || "",
+    fullText: clause.text || "",
+    riskLevel: "low",
+    pageNumber: clause.page || 0,
+    sourceReference: clause.chunk_id || "",
+    keyPoints: clause.key_points || [],
+  };
+}
+
+/* =========================================================
+   ERROR HANDLER
+========================================================= */
+
+async function handleResponse<T>(
+  response: Response
+): Promise<T> {
+  if (!response.ok) {
+    let errorMessage =
+      `Request failed with status ${response.status}`;
+
+    try {
+      const errorData = await response.json();
+
+      if (errorData?.detail) {
+        errorMessage =
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : JSON.stringify(errorData.detail);
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      // Response was not JSON
     }
 
-    return doc;
+    throw new Error(errorMessage);
   }
 
-  return toDocument(await request<BackendDocument>(`/documents/${id}`));
+  return response.json();
 }
+
+/* =========================================================
+   GENERIC FETCH
+========================================================= */
+
+async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      ...options,
+      headers: getApiHeaders(options.headers),
+    }
+  );
+
+  return handleResponse<T>(response);
+}
+
+/* =========================================================
+   UPLOAD DOCUMENT
+========================================================= */
 
 export async function uploadDocument(
   file: File
-): Promise<Document> {
-  if (USE_MOCK) {
-    await delay(1200);
+): Promise<AppDocument> {
+  const formData = new FormData();
 
-    const newDoc: Document = {
-      id: `doc-${Date.now()}`,
-      filename: file.name,
-      fileType: file.name.endsWith(".docx") ? "DOCX" : "PDF",
-      fileSize: file.size,
-      uploadDate: new Date().toISOString(),
+  formData.append("file", file);
+
+  const response = await fetch(
+    `${API_BASE_URL}/documents/upload`,
+    {
+      method: "POST",
+      body: formData,
+      headers: getApiHeaders(),
+    }
+  );
+
+  const uploaded =
+    await handleResponse<UploadResponse>(response);
+
+  return toDocument(
+    {
+      id: uploaded.document.id,
+      filename: uploaded.document.filename,
+      created_at: uploaded.document.created_at,
       status: "processing",
-    };
-
-    mockDocuments.unshift(newDoc);
-
-    return newDoc;
-  }
-
-  const form = new FormData();
-
-  form.append("file", file);
-
-  const res = await fetch(`${API_BASE_URL}/documents/upload`, {
-    method: "POST",
-    body: form,
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-
-    throw new Error(`Upload failed: ${res.status} ${errorText}`);
-  }
-
-  const uploaded = (await res.json()) as {
-    document_id: string;
-    original_filename: string;
-    created_at: string;
-  };
-
-  return toDocument({
-    id: uploaded.document_id,
-    filename: uploaded.original_filename,
-    created_at: uploaded.created_at,
-  });
+    },
+    file.size,
+    "processing"
+  );
 }
 
+/* =========================================================
+   DOCUMENTS
+========================================================= */
+
+export async function listDocuments(): Promise<AppDocument[]> {
+  const documents =
+    await apiFetch<DocumentResponse[]>(
+      "/documents"
+    );
+
+  return documents.map((document) =>
+    toDocument(document)
+  );
+}
 
 export async function deleteDocument(
-  id: string
+  documentId: string
 ): Promise<void> {
-  if (USE_MOCK) {
-    await delay(400);
-
-    const idx = mockDocuments.findIndex((d) => d.id === id);
-
-    if (idx !== -1) {
-      mockDocuments.splice(idx, 1);
+  await apiFetch<void>(
+    `/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "DELETE",
     }
-
-    return;
-  }
-
-  await request(`/documents/${id}`, {
-    method: "DELETE",
-  });
+  );
 }
 
-export async function getAnalysis(
+/* =========================================================
+   ANALYZE DOCUMENT
+========================================================= */
+
+export async function analyzeDocument(
   documentId: string
-): Promise<AnalysisResult> {
-  if (USE_MOCK) {
-    await delay(400);
-
-    return {
-      ...mockAnalysis,
-      documentId,
-    };
-  }
-
-  const result = await request<{
-    document_id: string;
-    overall_risk: RiskLevel;
-    risk_score: number;
-    total_clauses: number;
-    total_risks: number;
-    high_risks: number;
-    medium_risks: number;
-    low_risks: number;
-    summary: string;
-  }>(`/documents/${documentId}/analysis`);
-
-  return {
-    documentId: result.document_id,
-    overallRisk: result.overall_risk,
-    riskScore: result.risk_score,
-    clausesCount: result.total_clauses,
-    risksCount: result.total_risks,
-    highRisks: result.high_risks,
-    mediumRisks: result.medium_risks,
-    lowRisks: result.low_risks,
-    summary: result.summary,
-  };
+): Promise<AnalysisResponse> {
+  return apiFetch<AnalysisResponse>(
+    `/documents/${encodeURIComponent(documentId)}/analyze`,
+    {
+      method: "POST",
+    }
+  );
 }
 
 export async function triggerAnalysis(
   documentId: string
 ): Promise<void> {
-  if (USE_MOCK) {
-    await delay(500);
+  await analyzeDocument(documentId);
+}
 
-    return;
-  }
+/* =========================================================
+   GET DOCUMENT
+========================================================= */
 
-  await request(`/documents/${documentId}/analyze`, {
-    method: "POST",
+export async function getDocument(
+  documentId: string
+): Promise<AppDocument> {
+  const [document, analysis] =
+    await Promise.all([
+      apiFetch<DocumentResponse>(
+        `/documents/${encodeURIComponent(documentId)}`
+      ),
+
+      apiFetch<BackendAnalysisSummary>(
+        `/documents/${encodeURIComponent(documentId)}/analysis`
+      ).catch(() => null),
+    ]);
+
+  return toDocument({
+    ...document,
+    ...analysis,
   });
 }
 
-export async function processDocument(
+/* =========================================================
+   GET ANALYSIS
+========================================================= */
+
+export async function getAnalysis(
   documentId: string
-): Promise<void> {
-  if (USE_MOCK) {
-    await delay(500);
+): Promise<AppAnalysisResult> {
+  const result =
+    await apiFetch<BackendAnalysisSummary>(
+      `/documents/${encodeURIComponent(documentId)}/analysis`
+    );
 
-    return;
-  }
-
-  await request(`/documents/${documentId}/process`, {
-    method: "POST",
-  });
+  return {
+    documentId: result.document_id,
+    overallRisk: getRiskLevel(
+      result.overall_risk,
+      result.risk_score
+    ),
+    riskScore: result.risk_score,
+    clausesCount: result.total_clauses,
+    risksCount: result.total_risks,
+    highRisks: result.high_risks || 0,
+    mediumRisks: result.medium_risks || 0,
+    lowRisks: result.low_risks || 0,
+    summary: result.summary || "",
+  };
 }
 
-export async function getRisks(
-  documentId: string
-): Promise<Risk[]> {
-  if (USE_MOCK) {
-    await delay(350);
-
-    return mockRisks.filter((r) => r.documentId === "doc-001");
-  }
-
-  const response = await request<{
-    risks: Array<{
-      id: number;
-      risk_level: string;
-      category: string;
-      title: string;
-      explanation: string;
-      reason: string;
-      page: number;
-      text: string;
-    }>;
-  }>(`/documents/${documentId}/risks`);
-
-  return response.risks.map((risk) => ({
-    id: String(risk.id),
-    documentId,
-    title: risk.title,
-    category: risk.category,
-    severity: risk.risk_level.toLowerCase() as RiskLevel,
-    explanation: risk.explanation,
-    whyRisky: risk.reason,
-    pageNumber: risk.page,
-    clauseText: risk.text,
-  }));
-}
-
+/* =========================================================
+   GET CLAUSES
+========================================================= */
 
 export async function getClauses(
   documentId: string
-): Promise<Clause[]> {
-  if (USE_MOCK) {
-    await delay(350);
+): Promise<AppClause[]> {
+  const response =
+    await apiFetch<{ clauses: Clause[] }>(
+      `/documents/${encodeURIComponent(documentId)}/clauses`
+    );
 
-    return mockClauses.filter((c) => c.documentId === "doc-001");
+  return (response.clauses || []).map(
+    (clause) => toClause(documentId, clause)
+  );
+}
+
+/* =========================================================
+   GET RISKS
+========================================================= */
+
+export async function getRisks(
+  documentId: string
+): Promise<AppRisk[]> {
+  const response =
+    await apiFetch<{ risks: Risk[] }>(
+      `/documents/${encodeURIComponent(documentId)}/risks`
+    );
+
+  return (response.risks || []).map(
+    (risk) => toRisk(documentId, risk)
+  );
+}
+
+/* =========================================================
+   DOWNLOAD SUMMARY PDF
+========================================================= */
+
+export async function downloadSummaryPDF(
+  documentId: string
+): Promise<Blob> {
+  const response = await fetch(
+    `${API_BASE_URL}/reports/${documentId}/summary`,
+    {
+      method: "GET",
+      headers: getApiHeaders(
+        undefined,
+        "application/pdf"
+      ),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Unable to download PDF"
+    );
   }
 
-  const response = await request<{
-    clauses: Array<{
-      id: number;
-      clause_type: string;
-      title: string;
-      summary: string;
-      page: number;
-      text: string;
-      chunk_id: string;
-    }>;
-  }>(`/documents/${documentId}/clauses`);
+  return response.blob();
+}
 
-  return response.clauses.map((clause) => ({
-    id: String(clause.id),
-    documentId,
-    title: clause.title,
-    category: clause.clause_type as Clause["category"],
-    summary: clause.summary,
-    fullText: clause.text,
-    riskLevel: "low",
-    pageNumber: clause.page,
-    sourceReference: clause.chunk_id,
-  }));
+export async function downloadSummary(
+  documentId: string
+): Promise<void> {
+  const blob =
+    await downloadSummaryPDF(documentId);
+
+  const url =
+    window.URL.createObjectURL(blob);
+
+  const link =
+    document.createElement("a");
+
+  link.href = url;
+  link.download =
+    "ClauseLens_Contract_Analysis_Summary.pdf";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadSummaryPdf(
+  documentId: string
+): Promise<void> {
+  return downloadSummary(documentId);
+}
+
+/* =========================================================
+   ASK CONTRACT
+========================================================= */
+
+export async function askContract(
+  documentId: string,
+  question: string
+): Promise<ChatResponse> {
+  const result =
+    await askQuestion(
+      documentId,
+      question
+    );
+
+  return {
+    answer: result.answer,
+    sources: result.citation
+      ? [
+          {
+            page: result.citation.page,
+            text: result.citation.excerpt,
+            chunk_id: result.citation.section,
+          },
+        ]
+      : [],
+  };
 }
 
 export async function getChatHistory(
-  documentId: string
-): Promise<ChatMessage[]> {
-  if (USE_MOCK) {
-    await delay(300);
-
-    return [...mockChatHistory];
-  }
-
+  _documentId: string
+): Promise<AppChatMessage[]> {
   return [];
 }
 
 export async function askQuestion(
   documentId: string,
   question: string
-): Promise<AskResponse> {
-  if (USE_MOCK) {
-    await delay(1400);
-
-    const answers: Record<string, AskResponse> = {
-      default: {
-        answer:
-          "Based on the contract, this is addressed in the relevant section. The agreement provides specific terms and conditions that govern this aspect of the employment relationship. I recommend reviewing the relevant clauses carefully and seeking professional legal advice if you have concerns.",
-        citation: {
-          page: 4,
-          section: "Section 8.2",
-          excerpt:
-            '"The parties agree that the terms set out herein shall govern the employment relationship in its entirety..."',
-        },
-      },
-    };
-
-    const lq = question.toLowerCase();
-
-    if (lq.includes("notice") || lq.includes("resign")) {
-      return {
-        answer:
-          "The agreement requires three months written notice from the employee to terminate. The employer may elect to make a payment in lieu of notice instead of requiring you to work the full period. Note that you cannot take other employment during the notice period without the employer's written consent.",
-        citation: {
-          page: 4,
-          section: "Section 8.1",
-          excerpt:
-            '"Either party may terminate this Agreement by giving three (3) months written notice to the other party..."',
-        },
-      };
-    }
-
-    if (lq.includes("non-compete") || lq.includes("competitor")) {
-      return {
-        answer:
-          "Yes, there is a non-compete clause. You are prohibited from working for any competitor or starting a competing business for 24 months after termination, covering the entire UK and any country where the company operates. This is a broad restriction and you should seek legal advice about its enforceability.",
-        citation: {
-          page: 6,
-          section: "Section 12.1",
-          excerpt:
-            '"For a period of twenty-four (24) months following termination... the Employee shall not directly or indirectly engage in... any business that competes..."',
-        },
-      };
-    }
-
-    if (lq.includes("ip") || lq.includes("intellectual property")) {
-      return {
-        answer:
-          "The IP clause is broad and potentially concerning. It states that any inventions, software, or other IP you create that relates to the company's business — even outside working hours and using personal equipment — is automatically assigned to the employer. There is no carve-out for personal projects.",
-        citation: {
-          page: 5,
-          section: "Section 9.1",
-          excerpt:
-            '"...whether or not during working hours or using Company resources, that relate to the Company\'s business activities... shall be the exclusive property of the Employer."',
-        },
-      };
-    }
-
-    if (lq.includes("leave") || lq.includes("holiday") || lq.includes("vacation")) {
-      return {
-        answer:
-          "You are entitled to 25 days of paid annual leave per year, plus public holidays. You can carry over a maximum of 5 days to the following leave year with your line manager's approval. Any unused leave beyond this limit is forfeited at the end of the leave year.",
-        citation: {
-          page: 8,
-          section: "Section 15.1",
-          excerpt:
-            '"The Employee is entitled to 25 days paid annual leave per leave year in addition to the applicable public holidays..."',
-        },
-      };
-    }
-
-    return answers.default;
-  }
-
-  const response = await request<{
-    answer: string;
-    citations: Array<{
-      page: number;
-      chunk_id: string;
-      excerpt: string;
-    }>;
-  }>(`/chat/?document_id=${encodeURIComponent(documentId)}&question=${encodeURIComponent(question)}`, {
-    method: "POST",
+): Promise<AppAskResponse> {
+  const query = new URLSearchParams({
+    document_id: documentId,
+    question,
   });
 
-  const citation = response.citations[0];
+  const result =
+    await apiFetch<{
+      answer: string;
+      citations?: Array<{
+        page?: number | string;
+        chunk_id?: string;
+        excerpt?: string;
+      }>;
+    }>(
+      `/chat/?${query.toString()}`,
+      {
+        method: "POST",
+      }
+    );
+
+  const citation =
+    result.citations?.[0];
+
+  const parsedPage =
+    Number(citation?.page);
 
   return {
-    answer: response.answer,
+    answer: result.answer,
     citation: {
-      page: citation?.page ?? 0,
-      section: citation?.chunk_id ?? "Contract",
-      excerpt: citation?.excerpt ?? "No source excerpt was returned.",
+      page: Number.isFinite(parsedPage)
+        ? parsedPage
+        : 0,
+      section:
+        citation?.chunk_id ||
+        "Contract",
+      excerpt:
+        citation?.excerpt ||
+        "No source excerpt was returned.",
     },
   };
 }
 
-export async function downloadAnalysisPDF(
-  documentId: string
-): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/reports/${encodeURIComponent(documentId)}/summary`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/pdf",
-      },
-    }
-  );
+/* =========================================================
+   HEALTH CHECK
+========================================================= */
 
-  if (!response.ok) {
-    const errorText = await response.text();
+export async function checkBackend(): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/health`,
+      {
+        method: "GET",
+      }
+    );
 
-    throw new Error(`Failed to generate analysis PDF (${response.status}): ${errorText}`);
+    return response.ok;
+  } catch {
+    return false;
   }
-
-  const blob = await response.blob();
-
-  if (blob.size === 0) {
-    throw new Error("The generated PDF is empty.");
-  }
-
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = "ClauseLens_Contract_Analysis_Summary.pdf";
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  setTimeout(() => {
-    window.URL.revokeObjectURL(url);
-  }, 1000);
 }
+
+/* =========================================================
+   DEFAULT API OBJECT
+========================================================= */
+
+const api = {
+  listDocuments,
+  deleteDocument,
+  uploadDocument,
+
+  analyzeDocument,
+  triggerAnalysis,
+
+  getDocument,
+  getAnalysis,
+
+  getClauses,
+  getRisks,
+
+  downloadSummaryPDF,
+  downloadSummary,
+  downloadSummaryPdf,
+
+  getChatHistory,
+  askQuestion,
+  askContract,
+
+  checkBackend,
+};
+
+export default api;

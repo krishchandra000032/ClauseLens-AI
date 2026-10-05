@@ -55,7 +55,7 @@ export default function AskGeneral() {
           description="Upload and analyze a contract before using the Ask feature."
           action={
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/app")}
               style={{
                 padding: "9px 20px",
                 background: "#1E3A8A",

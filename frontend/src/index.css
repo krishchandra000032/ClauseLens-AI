@@ -1,12 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, sans-serif;
-  --font-display: 'DM Sans', ui-sans-serif, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Inter Tight', ui-sans-serif, sans-serif;
+  --font-display: 'Archivo Black', ui-sans-serif, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-paper: #F3F0E9;
+  --color-ink: #17140F;
+  --color-blaze: #FF4F00;
+  --color-volt: #FFE500;
+  --color-rule: #D9D4C8;
 
   --color-background: #F7F9FC;
   --color-foreground: #0F172A;
@@ -60,10 +68,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'DM Sans', ui-sans-serif, sans-serif;
-}
-
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -90,4 +94,242 @@ h1, h2, h3, h4, h5, h6 {
   color: #0F172A;
   border-radius: 16px 16px 16px 4px;
   border: 1px solid #E2E8F0;
+}
+.analysis-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px;
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.analysis-header h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.analysis-header p {
+  color: #64748b;
+}
+
+.download-button {
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* STATISTICS */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 20px;
+  margin-bottom: 35px;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 22px;
+}
+
+.stat-card span {
+  display: block;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.stat-card strong {
+  font-size: 28px;
+}
+
+
+/* RISK COLORS */
+
+.risk-high {
+  color: #dc2626;
+}
+
+.risk-medium {
+  color: #d97706;
+}
+
+.risk-low {
+  color: #16a34a;
+}
+
+
+/* SECTIONS */
+
+.section {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+}
+
+.section h2 {
+  margin-top: 0;
+}
+
+
+/* PROGRESS */
+
+.risk-progress {
+  width: 100%;
+  height: 14px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.risk-progress-fill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 10px;
+}
+
+
+/* RISKS */
+
+.risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.risk-card {
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #f59e0b;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.risk-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.risk-card h3 {
+  margin: 0;
+}
+
+.severity {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.severity.high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.severity.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.severity.low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+
+/* CLAUSES */
+
+.clause-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.clause-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.clause-card h3 {
+  margin: 8px 0;
+}
+
+.clause-type {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.clause-card p {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.clause-card small {
+  color: #64748b;
+}
+
+
+/* STATES */
+
+.analysis-loading,
+.analysis-error {
+  max-width: 700px;
+  margin: 100px auto;
+  text-align: center;
+}
+
+.empty-state {
+  padding: 30px;
+  text-align: center;
+  color: #64748b;
+}
+
+
+@media (max-width: 800px) {
+
+  .stats-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .analysis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+}
+
+@media (max-width: 500px) {
+
+  .analysis-page {
+    padding: 20px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
