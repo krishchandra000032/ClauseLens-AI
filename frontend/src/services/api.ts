@@ -1,7 +1,3 @@
-/**
- * ClauseLens AI — FastAPI service layer
- */
-
 import type {
   Document,
   Risk,
@@ -11,6 +7,7 @@ import type {
   ChatMessage,
   AskResponse,
 } from "../types";
+
 import {
   mockDocuments,
   mockRisks,
@@ -20,20 +17,31 @@ import {
 } from "../data/mockData";
 
 const USE_MOCK = false;
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
+).replace(/\/$/, "");
 
 async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
     ...options,
   });
+
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
+
+    throw new Error(
+      `API error ${res.status}: ${text}`
+    );
   }
+
   return res.json() as Promise<T>;
 }
 
@@ -46,62 +54,102 @@ type BackendDocument = {
   filename: string;
   file_path?: string;
   created_at: string;
+
   total_clauses?: number;
   total_risks?: number;
 };
 
-function fileType(filename: string): Document["fileType"] {
-  const extension = filename.split(".").pop()?.toUpperCase();
-  return extension === "DOCX" || extension === "DOC" ? extension : "PDF";
+function fileType(
+  filename: string
+): Document["fileType"] {
+  const extension = filename
+    .split(".")
+    .pop()
+    ?.toUpperCase();
+
+  return extension === "DOCX" || extension === "DOC"
+    ? extension
+    : "PDF";
 }
 
-function riskLevel(score?: number): RiskLevel | undefined {
-  if (score === undefined) return undefined;
-  return score >= 70 ? "high" : score >= 40 ? "medium" : "low";
+function riskLevel(
+  score?: number
+): RiskLevel | undefined {
+  if (score === undefined) {
+    return undefined;
+  }
+
+  return score >= 70
+    ? "high"
+    : score >= 40
+      ? "medium"
+      : "low";
 }
 
-function toDocument(document: BackendDocument): Document {
+function toDocument(
+  document: BackendDocument
+): Document {
   return {
     id: document.id,
     filename: document.filename,
+
     fileType: fileType(document.filename),
+
     fileSize: 0,
+
     uploadDate: document.created_at,
-    status: document.total_risks === undefined ? "processing" : "completed",
+
+    status:
+      document.total_risks === undefined
+        ? "processing"
+        : "completed",
+
     clausesCount: document.total_clauses,
     risksCount: document.total_risks,
   };
 }
 
-// ── Documents ──────────────────────────────────────────────────────────────────
 
 export async function listDocuments(): Promise<Document[]> {
   if (USE_MOCK) {
     await delay();
+
     return [...mockDocuments];
   }
+
   const documents = await request<BackendDocument[]>("/documents/");
-  // The list endpoint is intentionally lightweight; hydrate each document so
-  // the dashboard can show its saved clause/risk counts.
+
   const detailedDocuments = await Promise.all(
     documents.map((document) => request<BackendDocument>(`/documents/${document.id}`))
   );
+
   return detailedDocuments.map(toDocument);
 }
 
-export async function getDocument(id: string): Promise<Document> {
+export async function getDocument(
+  id: string
+): Promise<Document> {
   if (USE_MOCK) {
     await delay(300);
+
     const doc = mockDocuments.find((d) => d.id === id) ?? mockDocuments[0];
-    if (!doc) throw new Error("Document not found");
+
+    if (!doc) {
+      throw new Error("Document not found");
+    }
+
     return doc;
   }
+
   return toDocument(await request<BackendDocument>(`/documents/${id}`));
 }
 
-export async function uploadDocument(file: File): Promise<Document> {
+export async function uploadDocument(
+  file: File
+): Promise<Document> {
   if (USE_MOCK) {
     await delay(1200);
+
     const newDoc: Document = {
       id: `doc-${Date.now()}`,
       filename: file.name,
@@ -110,17 +158,33 @@ export async function uploadDocument(file: File): Promise<Document> {
       uploadDate: new Date().toISOString(),
       status: "processing",
     };
+
     mockDocuments.unshift(newDoc);
+
     return newDoc;
   }
+
   const form = new FormData();
+
   form.append("file", file);
+
   const res = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-  const uploaded = await res.json() as { document_id: string; original_filename: string; created_at: string };
+
+  if (!res.ok) {
+    const errorText = await res.text();
+
+    throw new Error(`Upload failed: ${res.status} ${errorText}`);
+  }
+
+  const uploaded = (await res.json()) as {
+    document_id: string;
+    original_filename: string;
+    created_at: string;
+  };
+
   return toDocument({
     id: uploaded.document_id,
     filename: uploaded.original_filename,
@@ -128,28 +192,51 @@ export async function uploadDocument(file: File): Promise<Document> {
   });
 }
 
-export async function deleteDocument(id: string): Promise<void> {
+
+export async function deleteDocument(
+  id: string
+): Promise<void> {
   if (USE_MOCK) {
     await delay(400);
+
     const idx = mockDocuments.findIndex((d) => d.id === id);
-    if (idx !== -1) mockDocuments.splice(idx, 1);
+
+    if (idx !== -1) {
+      mockDocuments.splice(idx, 1);
+    }
+
     return;
   }
-  await request(`/documents/${id}`, { method: "DELETE" });
+
+  await request(`/documents/${id}`, {
+    method: "DELETE",
+  });
 }
 
-// ── Analysis ───────────────────────────────────────────────────────────────────
-
-export async function getAnalysis(documentId: string): Promise<AnalysisResult> {
+export async function getAnalysis(
+  documentId: string
+): Promise<AnalysisResult> {
   if (USE_MOCK) {
     await delay(400);
-    return { ...mockAnalysis, documentId };
+
+    return {
+      ...mockAnalysis,
+      documentId,
+    };
   }
+
   const result = await request<{
-    document_id: string; overall_risk: RiskLevel; risk_score: number;
-    total_clauses: number; total_risks: number; high_risks: number;
-    medium_risks: number; low_risks: number; summary: string;
+    document_id: string;
+    overall_risk: RiskLevel;
+    risk_score: number;
+    total_clauses: number;
+    total_risks: number;
+    high_risks: number;
+    medium_risks: number;
+    low_risks: number;
+    summary: string;
   }>(`/documents/${documentId}/analysis`);
+
   return {
     documentId: result.document_id,
     overallRisk: result.overall_risk,
@@ -163,68 +250,113 @@ export async function getAnalysis(documentId: string): Promise<AnalysisResult> {
   };
 }
 
-export async function triggerAnalysis(documentId: string): Promise<void> {
+export async function triggerAnalysis(
+  documentId: string
+): Promise<void> {
   if (USE_MOCK) {
     await delay(500);
+
     return;
   }
-  await request(`/documents/${documentId}/analyze`, { method: "POST" });
+
+  await request(`/documents/${documentId}/analyze`, {
+    method: "POST",
+  });
 }
 
-export async function processDocument(documentId: string): Promise<void> {
+export async function processDocument(
+  documentId: string
+): Promise<void> {
   if (USE_MOCK) {
     await delay(500);
+
     return;
   }
-  await request(`/documents/${documentId}/process`, { method: "POST" });
+
+  await request(`/documents/${documentId}/process`, {
+    method: "POST",
+  });
 }
 
-// ── Risks ──────────────────────────────────────────────────────────────────────
-
-export async function getRisks(documentId: string): Promise<Risk[]> {
+export async function getRisks(
+  documentId: string
+): Promise<Risk[]> {
   if (USE_MOCK) {
     await delay(350);
+
     return mockRisks.filter((r) => r.documentId === "doc-001");
   }
-  const response = await request<{ risks: Array<{
-    id: number; risk_level: string; category: string; title: string;
-    explanation: string; reason: string; page: number; text: string;
-  }> }>(`/documents/${documentId}/risks`);
+
+  const response = await request<{
+    risks: Array<{
+      id: number;
+      risk_level: string;
+      category: string;
+      title: string;
+      explanation: string;
+      reason: string;
+      page: number;
+      text: string;
+    }>;
+  }>(`/documents/${documentId}/risks`);
+
   return response.risks.map((risk) => ({
-    id: String(risk.id), documentId, title: risk.title, category: risk.category,
+    id: String(risk.id),
+    documentId,
+    title: risk.title,
+    category: risk.category,
     severity: risk.risk_level.toLowerCase() as RiskLevel,
-    explanation: risk.explanation, whyRisky: risk.reason, pageNumber: risk.page,
+    explanation: risk.explanation,
+    whyRisky: risk.reason,
+    pageNumber: risk.page,
     clauseText: risk.text,
   }));
 }
 
-// ── Clauses ────────────────────────────────────────────────────────────────────
 
-export async function getClauses(documentId: string): Promise<Clause[]> {
+export async function getClauses(
+  documentId: string
+): Promise<Clause[]> {
   if (USE_MOCK) {
     await delay(350);
+
     return mockClauses.filter((c) => c.documentId === "doc-001");
   }
-  const response = await request<{ clauses: Array<{
-    id: number; clause_type: string; title: string; summary: string;
-    page: number; text: string; chunk_id: string;
-  }> }>(`/documents/${documentId}/clauses`);
+
+  const response = await request<{
+    clauses: Array<{
+      id: number;
+      clause_type: string;
+      title: string;
+      summary: string;
+      page: number;
+      text: string;
+      chunk_id: string;
+    }>;
+  }>(`/documents/${documentId}/clauses`);
+
   return response.clauses.map((clause) => ({
-    id: String(clause.id), documentId, title: clause.title,
-    category: clause.clause_type as Clause["category"], summary: clause.summary,
-    fullText: clause.text, riskLevel: "low", pageNumber: clause.page,
+    id: String(clause.id),
+    documentId,
+    title: clause.title,
+    category: clause.clause_type as Clause["category"],
+    summary: clause.summary,
+    fullText: clause.text,
+    riskLevel: "low",
+    pageNumber: clause.page,
     sourceReference: clause.chunk_id,
   }));
 }
 
-// ── Chat ───────────────────────────────────────────────────────────────────────
-
-export async function getChatHistory(documentId: string): Promise<ChatMessage[]> {
+export async function getChatHistory(
+  documentId: string
+): Promise<ChatMessage[]> {
   if (USE_MOCK) {
     await delay(300);
+
     return [...mockChatHistory];
   }
-  // Chat history is currently client-side only; FastAPI exposes question answering.
+
   return [];
 }
 
@@ -234,6 +366,7 @@ export async function askQuestion(
 ): Promise<AskResponse> {
   if (USE_MOCK) {
     await delay(1400);
+
     const answers: Record<string, AskResponse> = {
       default: {
         answer:
@@ -246,7 +379,9 @@ export async function askQuestion(
         },
       },
     };
+
     const lq = question.toLowerCase();
+
     if (lq.includes("notice") || lq.includes("resign")) {
       return {
         answer:
@@ -259,6 +394,7 @@ export async function askQuestion(
         },
       };
     }
+
     if (lq.includes("non-compete") || lq.includes("competitor")) {
       return {
         answer:
@@ -271,6 +407,7 @@ export async function askQuestion(
         },
       };
     }
+
     if (lq.includes("ip") || lq.includes("intellectual property")) {
       return {
         answer:
@@ -283,6 +420,7 @@ export async function askQuestion(
         },
       };
     }
+
     if (lq.includes("leave") || lq.includes("holiday") || lq.includes("vacation")) {
       return {
         answer:
@@ -295,14 +433,23 @@ export async function askQuestion(
         },
       };
     }
+
     return answers.default;
   }
-  const response = await request<{ answer: string; citations: Array<{
-    page: number; chunk_id: string; excerpt: string;
-  }> }>(`/chat/?document_id=${encodeURIComponent(documentId)}&question=${encodeURIComponent(question)}`, {
+
+  const response = await request<{
+    answer: string;
+    citations: Array<{
+      page: number;
+      chunk_id: string;
+      excerpt: string;
+    }>;
+  }>(`/chat/?document_id=${encodeURIComponent(documentId)}&question=${encodeURIComponent(question)}`, {
     method: "POST",
   });
+
   const citation = response.citations[0];
+
   return {
     answer: response.answer,
     citation: {
@@ -311,4 +458,44 @@ export async function askQuestion(
       excerpt: citation?.excerpt ?? "No source excerpt was returned.",
     },
   };
+}
+
+export async function downloadAnalysisPDF(
+  documentId: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/reports/${encodeURIComponent(documentId)}/summary`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/pdf",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(`Failed to generate analysis PDF (${response.status}): ${errorText}`);
+  }
+
+  const blob = await response.blob();
+
+  if (blob.size === 0) {
+    throw new Error("The generated PDF is empty.");
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "ClauseLens_Contract_Analysis_Summary.pdf";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 1000);
 }
